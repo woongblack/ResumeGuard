@@ -50,7 +50,9 @@ export function InputForm({ onResult, onLoading }: Props) {
       const data: AnalyzeResponse = await res.json();
       onResult(data);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "알 수 없는 오류");
+      const msg = e instanceof Error ? e.message : "알 수 없는 오류";
+      console.error("[ResumeGuard] 분석 오류:", e);
+      setError(msg);
     } finally {
       onLoading(false);
     }
@@ -58,6 +60,19 @@ export function InputForm({ onResult, onLoading }: Props) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {error && (
+        <div style={{
+          background: "#fef2f2",
+          border: "1px solid #fecaca",
+          borderRadius: 8,
+          padding: "12px 16px",
+          color: "#dc2626",
+          fontSize: 14,
+          fontWeight: 500,
+        }}>
+          ⚠️ {error}
+        </div>
+      )}
       <div>
         <label style={labelStyle}>채용공고 URL</label>
         <input
@@ -149,8 +164,6 @@ export function InputForm({ onResult, onLoading }: Props) {
           onChange={(e) => setCoverText(e.target.value)}
         />
       </div>
-
-      {error && <p style={{ color: "#dc2626", margin: 0 }}>{error}</p>}
 
       <button style={submitStyle} onClick={handleSubmit}>
         서류 분석하기
