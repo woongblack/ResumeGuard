@@ -1,9 +1,13 @@
 import asyncio
+import logging
 from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
 
 from schemas import AnalyzeRequest, AnalyzeResponse, ParsePDFResponse
 from agents import LLMParseError
@@ -56,6 +60,13 @@ async def analyze(req: AnalyzeRequest):
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
+    for i, r in enumerate(results):
+        name = ["jd", "resume", "cover", "ai_detect"][i] if i < 4 else f"task{i}"
+        if isinstance(r, Exception):
+            logger.error("[agent:%s] failed: %s", name, r)
+        else:
+            logger.info("[agent:%s] ok, keys=%s", name, list(r.keys()) if isinstance(r, dict) else type(r))
+
     jd_result = results[0]
     if isinstance(jd_result, Exception) or not jd_result.get("requirements"):
         raise HTTPException(
@@ -67,7 +78,14 @@ async def analyze(req: AnalyzeRequest):
             },
         )
 
-    resume_result = results[1] if not isinstance(results[1], Exception) else {}
+    if isinstance(results[1], Exception):
+        logger.error("[agent:resume] all retries failed: %s", results[1])
+        raise HTTPException(
+            status_code=503,
+            detail={"error_code": "RESUME_ANALYZE_FAILED", "message": "이력서 분석에 실패했습니다. 잠시 후 다시 시도해주세요."},
+        )
+    resume_result = results[1]
+
     cover_result = results[2] if has_cover and not isinstance(results[2], Exception) else None
     ai_detection = results[3] if has_cover and not isinstance(results[3], Exception) else None
 
